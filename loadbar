@@ -1,0 +1,105 @@
+#!/usr/bin/env sh
+set -eu
+
+trap "tput cnorm" EXIT
+tput civis
+
+tput sc
+trap "tput rc; tput ed" WINCH
+
+print_usage(){
+cat << EOF
+Usage: $(basename $0)  [OPTION...]
+Display progress bar by reading values from stdin.
+
+  -t, --title TEXT        Display TEXT before the loading bar
+  -m, --max-value VALUE   Define the maximum value (default: 100)
+  -p, --percentage        Display percentage progress
+  -v, --value             Display progress by value
+  -s, --size              Define lenght of the loading bar (text included)
+  -f, --fill CHAR         Define the character to use for filled part of the bar
+  -b, --background CHAR   Define the character to use for the background part of the bar
+  -n, --no-color          Do not use colors for the loading bar
+  -h, --help              Display this help
+EOF
+}
+
+parse_args(){
+  OPTIONS=$(getopt -o 't:m:s:f:b:pvnh' -l title:,max-value:,size:,fill:,background:,percentage,value,no-color,help -- "$@")
+  eval set -- "$OPTIONS"
+  while true
+  do
+      case $1 in
+      -t|--title) title="$2"; shift 2;;
+      -m|--max-value) max=$2; shift 2;;
+      -s|--size) size=$2; shift 2;;
+      -p|--percentage) show_percentage=true; shift;;
+      -v|--value) show_value=true; shift;;
+      -f|--fill) fill_character="$2"; shift 2;;
+      -b|--background) background_character="$2"; shift 2;;
+      -n|--no-color) show_no_color=true; shift;;
+      -h|--help) print_usage; exit 0;;
+      --) shift ; break ;;
+      esac
+  done
+}
+
+init_values() {
+  [ -z "${title:-}" ] && title="" || title="$title "
+  [ -z "${show_percentage:-}" ] && show_percentage=''
+  [ -z "${show_value:-}" ] && show_value=''
+  title_size="${#title}"
+  max=${max:-100}
+  value_progress=" [${max}/${max}]"
+  value_progress_size=${#value_progress}
+  percentage=" [100%]"
+  percentage_size=${#percentage}
+  fill_character=${fill_character:-█}
+  background_character=${background_character:-░}
+  [ -z "${show_no_color:-}" ] && reset_color="\E[0m" || reset_color=""
+  [ -z "${show_no_color:-}" ] && fill_color="\E[32m" || fill_color=""
+  [ -z "${show_no_color:-}" ] && empty_color="\E[30m" || empty_color=""
+}
+
+validate_values(){
+  [ ! ${#fill_character} -eq 1 ] && echo "Invalid character '${fill_character}': Fill charachter should be of size 1" >&2 && exit 1;
+  [ ! ${#background_character} -eq 1 ] && echo "Invalid character '${background_character}': Background character should be of size 1" >&2 && exit 1;
+  return 0
+}
+
+is_number() {
+  [ -n "$1" ] && [ "$1" -eq "$1" ]
+}
+
+display_bar() {
+  while read -r value
+  do
+    is_number "$value" || continue
+  	terminal_size=$(tput cols)
+  	bar_size=${size:-$terminal_size}
+  	[ -z "$title" ] || bar_size=$(( bar_size - title_size ))
+  	[ -z "$show_percentage" ] || bar_size=$(( bar_size - percentage_size ))
+  	[ -z "$show_value" ] || bar_size=$(( bar_size - value_progress_size ))
+  	[ "$value" -gt "$max" ] && value="$max"
+  	[ "$value" -lt 0 ] && value=0
+  	percentage=$(( value * 100 / max ))
+  	fill_size=$(( bar_size * percentage / 100 ))
+  	empty_size=$(( bar_size - fill_size ))
+  	fill=$(printf "%${fill_size}s")
+  	empty=$(printf "%${empty_size}s")
+  	fill_with_character=$(echo ":${fill}:" | sed -e "s/ /${fill_character}/g" -e 's/://g' )
+  	empty_with_character=$(echo ":${empty}:" | sed -e "s/ /${background_character}/g" -e 's/://g')
+  	[ -z "$show_percentage" ] && placeholder_for_percentage="%0s" || placeholder_for_percentage="%${percentage_size}s"
+  	[ -z "$show_value" ] && placeholder_for_value="%0s" || placeholder_for_value="%${value_progress_size}s"
+  	[ -z "$show_percentage" ] && value_for_percentage="" || value_for_percentage=" [${percentage}%]"
+  	[ -z "$show_value" ] && value_for_value="" || value_for_value=" [${value}/${max}]"
+  	printf "\r${title}${fill_color}${fill_with_character}${empty_color}${empty_with_character}${reset_color}${fill_color}${placeholder_for_percentage}${placeholder_for_value}" "${value_for_percentage}" "${value_for_value}"
+  done
+}
+
+parse_args "$@"
+init_values
+validate_values
+display_bar
+echo
+
