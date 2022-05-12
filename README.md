@@ -1,8 +1,8 @@
-Loadbar: a POSIX compliant script to display progress bar
-=========================================================
+Loadbar: a shell progress bar
+=============================
 
-Loadbar is a simple script to display progress bar on your terminal.
-It reads value from stdin and compute a percentage (assuming max value is 100 if no option passed).
+Loadbar is a POSIX shell script that display a progress bar on your terminal.
+It reads values from stdin and compute a percentage (assuming max value is 100 if no option passed, see below).
 
 It support these different options:
 
