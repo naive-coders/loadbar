@@ -67,7 +67,7 @@ validate_values(){
 }
 
 is_number() {
-  [ -n "$1" ] && [ "$1" -eq "$1" ]
+  printf '%d' "${var}" >/dev/null 2>&1
 }
 
 display_bar() {
