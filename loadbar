@@ -1,5 +1,4 @@
 #!/usr/bin/env sh
-set -eu
 
 trap "tput cnorm" EXIT
 tput civis
