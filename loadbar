@@ -6,8 +6,8 @@ tput civis
 tput sc
 trap "tput rc; tput ed" WINCH
 
-print_usage(){
-cat << EOF
+print_usage() {
+	cat <<EOF
 Usage: $(basename "$0")  [OPTION...]
 Display progress bar by reading values from stdin.
 
@@ -23,117 +23,185 @@ Display progress bar by reading values from stdin.
 EOF
 }
 
-check_arg_for(){
-  [ "$2" ] || { echo "Err: $1 requires a non-empty option argument" 2>&1; exit 1;}
+check_arg_for() {
+	[ "$2" ] || {
+		echo "Err: $1 requires a non-empty option argument" 2>&1
+		exit 1
+	}
 }
 
-parse_long(){
-  i=0
-  args_count=$#
-	while [ $i -lt $args_count ] 
-  do
-		i=$(( i+1 ))
-    case "$1" in
-  		--title)title="$2"; shift 2; continue;;
-  		--title=*)title="${1#*=}"; shift; continue;;
-  		--max-value)max="$2"; shift 2; continue;;
-  		--max-value=*)max="${1#*=}"; shift; continue;;
-  		--size)size="$2"; shift 2; continue;;
-  		--size=*)size="${1#*=}"; shift; continue;;
-  		--fill)fill_character="$2"; shift 2; continue;;
-  		--fill=*)fill_character="$2"; shift; continue;;
-  		--background)background_character="$2"; shift 2; continue;;
-  		--background=*)background_character="${1#*=}"; shift 2; continue;;
-  		--percentage)show_percentage=true; shift; continue;;
-  		--value)show_value=true; shift; continue;;
-  		--no-color)show_no_color=true; shift; continue;;
-  		--help)print_usage; exit 0; continue;;
-      *) set -- "$@" "$1"; shift;;
-    esac
-  done
-  parse_args "$@"
+parse_args() {
+	while getopts ":t:m:s:f:b:pvnh" option "$@"; do
+		case "${option}" in
+		t) title="${OPTARG}" ;;
+		m) max="${OPTARG}" ;;
+		s) size="${OPTARG}" ;;
+		p) show_percentage=true ;;
+		v) show_value=true ;;
+		f) fill_character="${OPTARG}" ;;
+		b) background_character="${OPTARG}" ;;
+		n) show_no_color=true ;;
+		h)
+			print_usage
+			exit 0
+			;;
+		*)
+			echo "Invalid arg: ${option}" >&2
+			print_usage
+			exit 1
+			;;
+		esac
+	done
 }
 
-parse_args(){
-  while getopts ":t:m:s:f:b:pvnh" option "$@"
-  do
-      case "${option}" in
-      t) title="${OPTARG}";;
-      m) max="${OPTARG}";;
-      s) size="${OPTARG}";;
-      p) show_percentage=true;;
-      v) show_value=true;;
-      f) fill_character="${OPTARG}";;
-      b) background_character="${OPTARG}";;
-      n) show_no_color=true;;
-      h) print_usage; exit 0;;
-			*) echo "Invalid arg: ${option}" >&2; print_usage; exit 1;
-      esac
-  done
+parse_long() {
+	i=0
+	args_count=$#
+	while [ $i -lt $args_count ]; do
+		i=$((i + 1))
+		case "$1" in
+		--title)
+			title="$2"
+			shift 2
+			i=$((i += 1)) continue
+			;;
+		--title=*)
+			title="${1#*=}"
+			shift
+			continue
+			;;
+		--max-value)
+			max="$2"
+			shift 2
+			i=$((i += 1))
+			continue
+			;;
+		--max-value=*)
+			max="${1#*=}"
+			shift
+			continue
+			;;
+		--size)
+			size="$2"
+			shift 2
+			i=$((i += 1))
+			continue
+			;;
+		--size=*)
+			size="${1#*=}"
+			shift
+			continue
+			;;
+		--fill)
+			fill_character="$2"
+			shift 2
+			i=$((i += 1))
+			continue
+			;;
+		--fill=*)
+			fill_character="$2"
+			shift
+			i=$((i += 1))
+			continue
+			;;
+		--background)
+			background_character="$2"
+			shift 2
+			i=$((i += 1))
+			continue
+			;;
+		--background=*)
+			background_character="${1#*=}"
+			shift 2
+			i=$((i += 1))
+			continue
+			;;
+		--percentage)
+			show_percentage=true
+			shift
+			continue
+			;;
+		--value)
+			show_value=true
+			shift
+			continue
+			;;
+		--no-color)
+			show_no_color=true
+			shift
+			continue
+			;;
+		--help)
+			print_usage
+			exit 0
+			continue
+			;;
+		*)
+			set -- "$@" "$1"
+			shift
+			;;
+		esac
+	done
+	parse_args "$@"
 }
 
 init_values() {
-  [ -z "${title:-}" ] && title="" || title="$title "
-  [ -z "${show_percentage:-}" ] && show_percentage=''
-  [ -z "${show_value:-}" ] && show_value=''
-  title_size="${#title}"
-  max=${max:-100}
-  value_progress=" [${max}/${max}]"
-  value_progress_size=${#value_progress}
-  percentage=" [100%]"
-  percentage_size=${#percentage}
-  fill_character=${fill_character:-█}
-  background_character=${background_character:-░}
-  fill_color=$(tput setaf 2)
-  reset_color=$(tput sgr0)
+	[ -z "${title:-}" ] && title="" || title="$title "
+	[ -z "${show_percentage:-}" ] && show_percentage=''
+	[ -z "${show_value:-}" ] && show_value=''
+	title_size="${#title}"
+	max=${max:-100}
+	value_progress=" [${max}/${max}]"
+	value_progress_size=${#value_progress}
+	percentage=" [100%]"
+	percentage_size=${#percentage}
+	fill_character=${fill_character:-█}
+	background_character=${background_character:-░}
+	fill_color=$(tput setaf 2)
+	reset_color=$(tput sgr0)
 }
 
-validate_values(){
-  [ ! ${#fill_character} -eq 1 ] && echo "Invalid character '${fill_character}': Fill charachter should be of size 1" >&2 && exit 1;
-  [ ! ${#background_character} -eq 1 ] && echo "Invalid character '${background_character}': Background character should be of size 1" >&2 && exit 1;
-  return 0
+validate_values() {
+	[ ! "${#fill_character}" -eq 1 ] && [ ! "$(printf "%s" "$fill_character" | wc -m)" -eq 1 ] && echo "Invalid character ${fill_character}: Fill charachter should be of size 1" >&2 && exit 1
+	[ ! ${#background_character} -eq 1 ] && [ ! "$(printf "%s" "$background_character" | wc -m)" -eq 1 ] && echo "Invalid character '${background_character}': Background character should be of size 1" >&2 && exit 1
+	return 0
 }
 
 is_number() {
-  printf '%d' "${1}" >/dev/null 2>&1
+	printf '%d' "${1}" >/dev/null 2>&1
 }
 
-validate_value(){
-    is_number "$value" || return 1
-		[ "$value" -gt "$max" ] && value="$max"
-    [ "$value" -lt 0 ] && value=0
-		return 0
+validate_value() {
+	is_number "$1" && [ "$1" -le "$max" ] && [ "$1" -ge 0 ]
 }
 
-compute_bar_size(){
-  	bar_size=${size:-$(tput cols)}
-  	[ -z "$title" ] || bar_size=$(( bar_size - title_size ))
-  	[ -z "$show_percentage" ] || bar_size=$(( bar_size - percentage_size ))
-  	[ -z "$show_value" ] || bar_size=$(( bar_size - value_progress_size ))
+compute_bar_size() {
+	bar_size=${size:-$(tput cols)}
+	[ -z "$title" ] || bar_size=$((bar_size - title_size))
+	[ -z "$show_percentage" ] || bar_size=$((bar_size - percentage_size))
+	[ -z "$show_value" ] || bar_size=$((bar_size - value_progress_size))
 }
 
-draw_character_on(){
-    printf "%s" "$(printf ":%${2}s:" | sed -e "s/ /${1}/g" -e 's/://g' )"
+draw_character_on() {
+	printf "%s" "$(printf ":%${2}s:" | sed -e "s/ /${1}/g" -e 's/://g')"
 }
-
 
 display_bar() {
-  while read -r value
-  do
-    validate_value || continue
+	while read -r value; do
+		validate_value $value || continue
 		compute_bar_size
-    [ -n "$title" ] && printf "%s" "$title"
+		[ -n "$title" ] && printf "%s" "$title"
 		[ -z "$show_no_color" ] && printf "%b" "${fill_color}"
-  	percentage=$(( value * 100 / max ))
-  	fill_size=$(( bar_size * percentage / 100 ))
+		percentage=$((value * 100 / max))
+		fill_size=$((bar_size * percentage / 100))
 		draw_character_on "${fill_character}" "$fill_size"
-  	empty_size=$(( bar_size - fill_size ))
+		empty_size=$((bar_size - fill_size))
 		draw_character_on "${background_character}" "${empty_size}"
 		[ -z "$show_no_color" ] && printf "%b" "${reset_color}"
 		[ -n "$show_percentage" ] && printf "%${percentage_size}s" "[${percentage}%]"
 		[ -n "$show_value" ] && printf "%${value_progress_size}s" " [${value}/${max}]"
-    printf "\r"
-  done
+		printf "\r"
+	done
 }
 
 parse_long "$@"
@@ -141,4 +209,3 @@ init_values
 validate_values
 display_bar
 echo
-
